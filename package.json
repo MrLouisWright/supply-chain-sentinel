@@ -1,0 +1,72 @@
+{
+  "name": "supply-chain-sentinel",
+  "version": "0.0.0",
+  "description": "One supply-chain gate for npm projects: runs package-tripwire (risky dependency changes), license-sentinel (license policy), sbom-diff-sentinel (new vulnerabilities and SBOM drift) and workflow-sentinel (GitHub Actions hardening) with one config, one combined report (text, JSON, SARIF, Markdown) and one exit code.",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "supply-chain-sentinel": "bin/supply-chain-sentinel.js"
+  },
+  "files": [
+    "src",
+    "bin",
+    "action.yml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "supply-chain",
+    "supply-chain-security",
+    "dependencies",
+    "npm",
+    "lockfile",
+    "license",
+    "sbom",
+    "cyclonedx",
+    "github-actions",
+    "osv",
+    "devsecops",
+    "security",
+    "sarif",
+    "cli",
+    "github-action"
+  ],
+  "author": "Louis Wright <hello@louiswright.co.uk> (https://github.com/MrLouisWright)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MrLouisWright/supply-chain-sentinel.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MrLouisWright/supply-chain-sentinel/issues"
+  },
+  "homepage": "https://github.com/MrLouisWright/supply-chain-sentinel#readme",
+  "dependencies": {
+    "license-sentinel": "1.0.0",
+    "package-tripwire": "1.0.1",
+    "workflow-sentinel": "1.0.0"
+  },
+  "peerDependencies": {
+    "sbom-diff-sentinel": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "sbom-diff-sentinel": {
+      "optional": true
+    }
+  }
+}

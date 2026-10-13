@@ -1,0 +1,62 @@
+name: 'supply-chain-sentinel'
+description: 'Run package-tripwire, license-sentinel, sbom-diff-sentinel and workflow-sentinel as one gate'
+author: 'Louis Wright'
+branding: { icon: 'package', color: 'purple' }
+inputs:
+  targets: { description: 'Project directory', default: '.' }
+  base: { description: 'Git ref to compare dependency changes against (default: the PR base or HEAD~1)', default: '' }
+  only: { description: 'Comma-separated checks to run: tripwire, license, sbom, workflows', default: '' }
+  offline: { description: 'Set to true to skip registry and OSV lookups', default: 'false' }
+  fail-on: { description: 'critical | high | medium | low | info | none', default: 'high' }
+  config: { description: 'Path to JSON config file', default: '' }
+  sarif: { description: 'Write SARIF to this path', default: '' }
+  json: { description: 'Write JSON report to this path', default: '' }
+  job-summary: { description: 'Write the Markdown report to the job summary (true/false)', default: 'true' }
+  args: { description: 'Extra CLI arguments', default: '' }
+outputs:
+  markdown-file: { description: 'Path of the Markdown report', value: '${{ steps.run.outputs.markdown-file }}' }
+  exit-code: { description: 'Exit code of the scan (0 pass, 1 findings, 2 error)', value: '${{ steps.run.outputs.exit-code }}' }
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with: { node-version: '20' }
+    - name: Install supply-chain-sentinel dependencies
+      shell: bash
+      env:
+        SCS_DIR: ${{ github.action_path }}
+      run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund --prefix "$SCS_DIR"
+    - id: run
+      shell: bash
+      env:
+        SCS_TARGETS: ${{ inputs.targets }}
+        SCS_BASE: ${{ inputs.base }}
+        SCS_ONLY: ${{ inputs.only }}
+        SCS_OFFLINE: ${{ inputs.offline }}
+        SCS_FAIL_ON: ${{ inputs.fail-on }}
+        SCS_CONFIG: ${{ inputs.config }}
+        SCS_SARIF: ${{ inputs.sarif }}
+        SCS_JSON: ${{ inputs.json }}
+        SCS_JOB_SUMMARY: ${{ inputs.job-summary }}
+        SCS_ARGS: ${{ inputs.args }}
+        SCS_BIN: ${{ github.action_path }}/bin/supply-chain-sentinel.js
+      run: |
+        md="$RUNNER_TEMP/supply-chain-sentinel.md"
+        # shellcheck disable=SC2206
+        targets=($SCS_TARGETS)
+        args=("${targets[@]}" --fail-on "$SCS_FAIL_ON" --markdown "$md")
+        [ -n "$SCS_BASE" ] && args+=(--base "$SCS_BASE")
+        [ -n "$SCS_ONLY" ] && args+=(--only "$SCS_ONLY")
+        [ "$SCS_OFFLINE" = "true" ] && args+=(--offline)
+        [ -n "$SCS_CONFIG" ] && args+=(--config "$SCS_CONFIG")
+        [ -n "$SCS_SARIF" ] && args+=(--sarif "$SCS_SARIF")
+        [ -n "$SCS_JSON" ] && args+=(--json "$SCS_JSON")
+        set +e
+        # shellcheck disable=SC2086
+        node "$SCS_BIN" "${args[@]}" $SCS_ARGS
+        code=$?
+        set -e
+        echo "markdown-file=$md" >> "$GITHUB_OUTPUT"
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        if [ "$SCS_JOB_SUMMARY" = "true" ] && [ -f "$md" ]; then cat "$md" >> "$GITHUB_STEP_SUMMARY"; fi
+        exit $code
