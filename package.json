@@ -55,7 +55,7 @@
   "bugs": {
     "url": "https://github.com/MrLouisWright/supply-chain-sentinel/issues"
   },
-  "homepage": "https://github.com/MrLouisWright/supply-chain-sentinel#readme",
+  "homepage": "https://mrlouiswright.github.io/supply-chain-sentinel/",
   "dependencies": {
     "license-sentinel": "1.0.0",
     "package-tripwire": "1.0.1",
