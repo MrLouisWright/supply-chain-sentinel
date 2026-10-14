@@ -95,6 +95,10 @@ process.exitCode = exitCode(report, 'high');
 
 Node.js 18 or newer, and `git` for the `tripwire` and `sbom` comparisons. Runtime dependencies: package-tripwire, license-sentinel, workflow-sentinel (and their own, e.g. `yaml`), plus the optional peer sbom-diff-sentinel.
 
+## Support
+
+If this project is useful to you, you can support its development with a donation: [Buy me a coffee](https://donate.stripe.com/aFa00lek3cvX4Ds2Fk9EI0b). It helps keep these tools maintained, documented and free for everyone.
+
 ## License
 
-MIT © Louis Wright
+MIT © Louis Wright ([Louis Wright](https://github.com/MrLouisWright))
