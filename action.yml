@@ -11,6 +11,8 @@ inputs:
   config: { description: 'Path to JSON config file', default: '' }
   sarif: { description: 'Write SARIF to this path', default: '' }
   json: { description: 'Write JSON report to this path', default: '' }
+  baseline: { description: 'Shared baseline file: known findings from every check are hidden', default: '' }
+  min-score: { description: 'Fail when the combined score (0-100) is below this', default: '' }
   job-summary: { description: 'Write the Markdown report to the job summary (true/false)', default: 'true' }
   args: { description: 'Extra CLI arguments', default: '' }
 outputs:
@@ -37,6 +39,8 @@ runs:
         SCS_CONFIG: ${{ inputs.config }}
         SCS_SARIF: ${{ inputs.sarif }}
         SCS_JSON: ${{ inputs.json }}
+        SCS_BASELINE: ${{ inputs.baseline }}
+        SCS_MIN_SCORE: ${{ inputs.min-score }}
         SCS_JOB_SUMMARY: ${{ inputs.job-summary }}
         SCS_ARGS: ${{ inputs.args }}
         SCS_BIN: ${{ github.action_path }}/bin/supply-chain-sentinel.js
@@ -51,6 +55,8 @@ runs:
         [ -n "$SCS_CONFIG" ] && args+=(--config "$SCS_CONFIG")
         [ -n "$SCS_SARIF" ] && args+=(--sarif "$SCS_SARIF")
         [ -n "$SCS_JSON" ] && args+=(--json "$SCS_JSON")
+        [ -n "$SCS_BASELINE" ] && args+=(--baseline "$SCS_BASELINE")
+        [ -n "$SCS_MIN_SCORE" ] && args+=(--min-score "$SCS_MIN_SCORE")
         set +e
         # shellcheck disable=SC2086
         node "$SCS_BIN" "${args[@]}" $SCS_ARGS

@@ -117,6 +117,8 @@ export function formatText(r, { color = false, failOn, fixes = true } = {}) {
     l.push('');
   }
   if (r.suppressed.length) l.push(c('dim', `${r.suppressed.length} finding(s) suppressed by allowlist`));
+  if (r.baselined?.length) l.push(c('dim', `${r.baselined.length} known finding(s) hidden by the baseline`));
+  if (r.score && r.score.overall != null) l.push(c('bold', `Score: ${r.score.overall}/100 (${r.score.grade}) — ${Object.entries(r.score.byCheck).map(([k, v]) => `${k} ${v.score ?? v.status}`).join(', ')}`));
   l.push(countLine(r.counts));
   if (failOn) l.push(exceeds(r, failOn) ? c('red', `✖ Failing (fail-on: ${failOn}).`) : c('green', `✔ Passing (fail-on: ${failOn}).`));
   return l.join('\n') + '\n';
@@ -147,6 +149,8 @@ export function formatSarif(r, tool) {
 const esc = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ').replace(/</g, '&lt;');
 export function formatMarkdown(r, { failOn, title, emoji = '🛡️' } = {}) {
   const l = [`## ${emoji} ${title || r.tool}`, '', `Checked **${r.targets.length}** target(s): ${countLine(r.counts)}.`];
+  if (r.score && r.score.overall != null) l.push('', `**Score: ${r.score.overall}/100 (${r.score.grade})**`, '', '| Check | Score |', '|---|---|', ...Object.entries(r.score.byCheck).map(([k, v]) => `| ${k} | ${v.score != null ? `${v.score} (${v.grade})` : v.status} |`));
+  if (r.baselined?.length) l.push('', `_${r.baselined.length} known finding(s) hidden by the baseline._`);
   if (failOn) l.push('', exceeds(r, failOn) ? `❌ Failing at \`--fail-on ${failOn}\`.` : `✅ Passing at \`--fail-on ${failOn}\`.`);
   for (const t of r.targets) {
     l.push('', `### ${esc(t.target)}`, '');

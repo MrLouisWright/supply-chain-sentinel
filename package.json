@@ -3,12 +3,19 @@
   "version": "1.0.0",
   "description": "One supply-chain gate for npm projects: runs package-tripwire (risky dependency changes), license-sentinel (license policy), sbom-diff-sentinel (new vulnerabilities and SBOM drift) and workflow-sentinel (GitHub Actions hardening) with one config, one combined report (text, JSON, SARIF, Markdown) and one exit code.",
   "type": "module",
-  "main": "./src/index.js",
-  "types": "./src/index.d.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.d.ts",
-      "default": "./src/index.js"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
@@ -16,6 +23,7 @@
     "supply-chain-sentinel": "bin/supply-chain-sentinel.js"
   },
   "files": [
+    "dist",
     "src",
     "bin",
     "action.yml",
@@ -27,7 +35,10 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "build": "node scripts/build.mjs",
+    "pretest": "npm run build",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "supply-chain",
@@ -61,16 +72,13 @@
   },
   "homepage": "https://mrlouiswright.github.io/supply-chain-sentinel/",
   "dependencies": {
-    "license-sentinel": "1.0.0",
-    "package-tripwire": "1.0.1",
-    "workflow-sentinel": "1.0.0"
+    "license-sentinel": "^1.1.0",
+    "package-tripwire": "^1.1.0",
+    "sbom-diff-sentinel": "^1.1.0",
+    "workflow-sentinel": "^1.1.0"
   },
-  "peerDependencies": {
-    "sbom-diff-sentinel": "^1.0.0"
-  },
-  "peerDependenciesMeta": {
-    "sbom-diff-sentinel": {
-      "optional": true
-    }
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.2"
   }
 }

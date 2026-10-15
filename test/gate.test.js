@@ -4,7 +4,8 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { check, exitCode, RULES, CHECKS, defaultBase } from '../src/index.js';
+import { check, exitCode, RULES, CHECKS, defaultBase, scoreReport, fingerprint, writeBaseline, readBaseline } from '../src/index.js';
+import { readFileSync } from 'node:fs';
 
 const lock = (pkgs) => JSON.stringify({ name: 'demo', version: '1.0.0', lockfileVersion: 3, requires: true, packages: { '': { name: 'demo', version: '1.0.0', license: 'MIT', dependencies: Object.fromEntries(Object.keys(pkgs).map((k) => [k, pkgs[k].version])) }, ...Object.fromEntries(Object.entries(pkgs).map(([k, v]) => [`node_modules/${k}`, { version: v.version, resolved: v.resolved || `https://registry.npmjs.org/${k}/-/${k}-${v.version}.tgz`, integrity: v.integrity || 'sha512-' + Buffer.from(k + v.version).toString('base64'), license: v.license || 'MIT', ...(v.hasInstallScript ? { hasInstallScript: true } : {}) }])) } }, null, 2);
 let dir;
@@ -46,13 +47,15 @@ test('shared allowlist and severity use prefixed ids and globs', async () => {
   assert.ok(![...s].some((k) => k.startsWith('workflows/'))); assert.ok(!s.has('tripwire/install-script'));
   assert.ok(r.suppressed.length > 0);
 });
-test('checks can be selected; missing sbom module is reported, not fatal', async () => {
-  const r = await check(dir, { offline: true, checks: ['sbom'], modules: {} });
-  if (!r.targets[0].summary || r.targets[0].summary.status === 'skipped') assert.ok(rules(r).has('check-unavailable') || r.targets[0].summary.status === 'skipped');
+test('checks can be selected; sbom-diff-sentinel is a declared dependency', async () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.match(pkg.dependencies['sbom-diff-sentinel'], /^\^1\./); assert.equal(pkg.peerDependencies, undefined);
+  const r = await check(dir, { offline: true, checks: ['sbom'], base: 'HEAD' });
+  assert.equal(r.targets[0].summary.status, 'ran');
   assert.notEqual(exitCode(r, 'high'), 2);
   await assert.rejects(() => check(dir, { checks: ['nope'] }), /Unknown check/);
 });
-test('real sbom-diff-sentinel when it is installed', { skip: !existsSync(new URL('../node_modules/sbom-diff-sentinel/package.json', import.meta.url)) && 'sbom-diff-sentinel not installed' }, async () => {
+test('real sbom-diff-sentinel runs with the shared base', async () => {
   const r = await check(dir, { offline: true, checks: ['sbom'], base: 'HEAD' });
   assert.equal(r.targets[0].summary.status, 'ran');
 });
@@ -79,4 +82,47 @@ test('CLI', () => {
   assert.equal(spawnSync('node', [bin, dir, '--only', 'bogus']).status, 2);
   assert.equal(spawnSync('node', [bin, '/nonexistent']).status, 2);
   assert.match(spawnSync('node', [bin, '--list-rules']).stdout.toString(), /workflows\/unpinned-action/);
+});
+
+test('combined score: per check, weighted, capped by criticals', async () => {
+  const r = await check(dir, { offline: true, base: 'HEAD', modules: { sbom: fakeSbom } });
+  assert.deepEqual(Object.keys(r.score.byCheck), CHECKS);
+  for (const v of Object.values(r.score.byCheck)) { assert.equal(v.status, 'ran'); assert.ok(v.score >= 0 && v.score <= 100); }
+  assert.ok(r.score.overall <= 49 && r.score.grade === 'F', 'critical sbom finding caps the score');
+  const fake = (t) => ({ findings: t.flatMap((x) => x.findings), targets: t });
+  const t = (target, sevs, status = 'ran') => ({ target, summary: { status }, findings: sevs.map((severity) => ({ severity })) });
+  const s = scoreReport(fake([t('tripwire', ['high']), t('license', []), t('sbom', [], 'skipped'), t('workflows', ['medium', 'low'])]));
+  assert.deepEqual(s, { overall: 93, grade: 'A', byCheck: { tripwire: { score: 85, grade: 'B', status: 'ran' }, license: { score: 100, grade: 'A', status: 'ran' }, sbom: { score: null, grade: null, status: 'skipped' }, workflows: { score: 94, grade: 'A', status: 'ran' } } });
+  assert.equal(scoreReport(fake([t('tripwire', ['high']), t('license', [])]), { weights: { tripwire: 3 } }).overall, 89);
+  assert.equal(scoreReport(fake([t('license', [])])).overall, 100);
+  assert.match((await import('../src/core.js')).formatText(r), /Score: \d+\/100 \(F\)/);
+  assert.match((await import('../src/core.js')).formatMarkdown(r), /\*\*Score: \d+\/100/);
+});
+test('shared baseline: one file for every check, only new findings count', async () => {
+  const opts = { offline: true, base: 'HEAD', modules: { sbom: fakeSbom } };
+  const first = await check(dir, opts);
+  const file = join(mkdtempSync(join(tmpdir(), 'scs-bl-')), 'baseline.json');
+  const b = writeBaseline(first, file, { base: 'HEAD' });
+  assert.ok(b.findings.length > 3); assert.equal(b.base, 'HEAD');
+  assert.ok(new Set(b.findings.map((f) => f.rule.split('/')[0])).size >= 3, 'covers several checks');
+  assert.deepEqual(readBaseline(file).findings, b.findings);
+  const again = await check(dir, { ...opts, base: undefined, baseline: file });
+  assert.equal(again.base, 'HEAD', 'base taken from baseline');
+  assert.equal(again.findings.filter((f) => f.rule.includes('/')).length, 0);
+  assert.equal(again.baselined.length, first.findings.filter((f) => f.rule.includes('/')).length);
+  assert.equal(again.score.overall, 100); assert.equal(exitCode(again, 'high'), 0);
+  const trimmed = { ...b, findings: b.findings.filter((f) => !f.rule.startsWith('workflows/')) };
+  const partial = await check(dir, { ...opts, baseline: trimmed });
+  assert.ok(partial.findings.length > 0 && partial.findings.every((f) => f.rule.startsWith('workflows/')));
+  assert.equal(fingerprint({ rule: 'a', location: 'x', message: 'one' }), fingerprint({ rule: 'a', location: 'x', message: 'two' }));
+  await assert.rejects(() => check(dir, { ...opts, baseline: join(tmpdir(), 'nope-baseline.json') }), /Cannot read baseline/);
+});
+test('CLI: --update-baseline, --baseline and --min-score', () => {
+  const bin = new URL('../bin/supply-chain-sentinel.js', import.meta.url).pathname;
+  const f = join(mkdtempSync(join(tmpdir(), 'scs-cli-')), 'b.json');
+  const args = [bin, dir, '--offline', '--base', 'HEAD', '--skip', 'sbom'];
+  const u = spawnSync('node', [...args, '--update-baseline', '--baseline', f]); assert.equal(u.status, 0, u.stderr.toString()); assert.match(u.stderr.toString(), /Wrote \d+ finding/);
+  const p = spawnSync('node', [...args, '--baseline', f]); assert.equal(p.status, 0, p.stdout.toString()); assert.match(p.stdout.toString(), /hidden by the baseline/);
+  const m = spawnSync('node', [bin, dir, '--offline', '--only', 'workflows', '--fail-on', 'none', '--min-score', '99']); assert.equal(m.status, 1); assert.match(m.stderr.toString(), /below --min-score/);
+  assert.equal(spawnSync('node', [bin, dir, '--min-score', 'abc']).status, 2);
 });
