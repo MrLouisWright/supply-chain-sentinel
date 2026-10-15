@@ -1,5 +1,7 @@
 # supply-chain-sentinel
 
+[![npm version](https://img.shields.io/npm/v/supply-chain-sentinel.svg)](https://www.npmjs.com/package/supply-chain-sentinel) [![CI](https://github.com/MrLouisWright/supply-chain-sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/MrLouisWright/supply-chain-sentinel/actions/workflows/ci.yml) [![Node](https://img.shields.io/node/v/supply-chain-sentinel.svg)](https://nodejs.org) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > One supply-chain gate for npm projects: risky dependency changes, license policy, new vulnerabilities and SBOM drift, and GitHub Actions hardening, with one config, one report and one exit code.
 
 `supply-chain-sentinel` runs four focused tools and merges their results:
