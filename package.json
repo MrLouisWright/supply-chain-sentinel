@@ -1,6 +1,6 @@
 {
   "name": "supply-chain-sentinel",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "One supply-chain gate for npm projects: runs package-tripwire (risky dependency changes), license-sentinel (license policy), sbom-diff-sentinel (new vulnerabilities and SBOM drift) and workflow-sentinel (GitHub Actions hardening) with one config, one combined report (text, JSON, SARIF, Markdown) and one exit code.",
   "type": "module",
   "main": "./dist/index.cjs",
